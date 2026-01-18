@@ -60,6 +60,7 @@ public:
         return *this;
     }
 
+    // move-assignment constructor
     Tensor &operator=(Tensor &&other) noexcept
     {
         // self-assignment check
@@ -79,6 +80,13 @@ public:
         }
         return *this;
     }
+
+    // getters
+    std::size_t size() const { return size_; }
+    const std::vector<std::size_t> &shape() const { return shape_; }
+    T &operator[](std::size_t index) { return data_[index]; }
+    std::size_t rows() const { return shape_.empty() ? 0 : shape_[0]; }
+    std::size_t cols() const { return shape_.size() < 2 ? 1 : shape_[1]; }
 
 private:
     T *data_;
