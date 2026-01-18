@@ -1,4 +1,4 @@
-# InferLite
+# Infera
 
 ![C++ CI](https://github.com/brandonviaje/InferLite/actions/workflows/cpp-tests.yml/badge.svg)
 
@@ -18,5 +18,6 @@ should prioritize:
 - throughput
 - latency
 - concurrency
+
 
 
