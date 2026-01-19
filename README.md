@@ -19,5 +19,7 @@ should prioritize:
 - latency
 - concurrency
 
+## System Architecture
 
+<img width="1000" height="700" alt="Inference Server" src="https://github.com/user-attachments/assets/50655ea3-88e2-40e3-b19d-f4f8e3b80f8a" />
 
