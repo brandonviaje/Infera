@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <cassert>
+#include <fstream>
 #include "../src/onnx-ml.pb.h"
 #include "../src/loader.h"
 #include "../src/tensor.h"
@@ -38,12 +39,64 @@ void test_load_onnx_tensor()
     std::cout << "ONNX Tensor conversion passed!" << std::endl;
 }
 
+void test_file_loading()
+{
+    std::string path{"models/mnist.onnx"};
+    std::ifstream input(path, std::ios::binary);
+
+    // check if can't find file
+    if (!input.is_open())
+    {
+        std::cout << "[INFO] Skipping random file test (file '" << path << "' not found)." << std::endl;
+        return;
+    }
+
+    // parse  File
+    onnx::ModelProto model;
+
+    if (!model.ParseFromIstream(&input))
+    {
+        throw std::runtime_error("Failed to parse ONNX file");
+    }
+
+    const onnx::GraphProto &graph{model.graph()};
+
+    // load every supported tensor
+    int success_count{};
+
+    for (int i = 0; i < graph.initializer_size(); ++i)
+    {
+        const onnx::TensorProto &tensor_proto = graph.initializer(i);
+
+        // only load float types for now
+        if (tensor_proto.data_type() == onnx::TensorProto::FLOAT)
+        {
+            try
+            {
+                Tensor<float> t = Loader::load_tensor(tensor_proto);
+
+                // assertions
+                assert(t.size() > 0);
+                assert(!t.shape().empty());
+                success_count++;
+            }
+            catch (const std::exception &e)
+            {
+                std::cerr << "Failed to load tensor " << tensor_proto.name() << ": " << e.what() << std::endl;
+                throw;
+            }
+        }
+    }
+    std::cout << "Successfully loaded " << success_count << " FLOAT tensors." << std::endl;
+}
+
 int main()
 {
     try
     {
         test_protobuf_instantiation();
         test_load_onnx_tensor();
+        test_file_loading();
         std::cout << "MODEL TESTS PASSED!" << std::endl;
     }
     catch (const std::exception &e)
