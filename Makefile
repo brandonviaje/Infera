@@ -11,34 +11,45 @@ BUILD_DIR = build
 # Source Files
 PROTO_SRC = $(SRC_DIR)/onnx-ml.pb.cc
 
+# Targets
+TENSOR_TEST_EXE = $(BUILD_DIR)/run_tensor_tests
+MODEL_TEST_EXE  = $(BUILD_DIR)/run_model_tests
+GRAPH_TEST_EXE = $(BUILD_DIR)/run_graph_tests
+
+all: test
+
+# Generate Protobuf files 
 $(SRC_DIR)/onnx-ml.pb.cc: proto/onnx-ml.proto
 	@echo "Generating Protobuf files..."
 	protoc --proto_path=proto --cpp_out=$(SRC_DIR) $<
 
-# Targets
-TENSOR_TEST_EXE = $(BUILD_DIR)/run_tensor_tests
-MODEL_TEST_EXE  = $(BUILD_DIR)/run_model_tests
-
-all: test
-
-# Run both test suites
-test: $(TENSOR_TEST_EXE) $(MODEL_TEST_EXE)
+# Run all tests
+test: $(TENSOR_TEST_EXE) $(MODEL_TEST_EXE) $(GRAPH_TEST_EXE)
 	@echo "--- Running Tensor Tests ---"
 	@./$(TENSOR_TEST_EXE)
 	@echo "\n--- Running Model Tests ---"
 	@./$(MODEL_TEST_EXE)
+	@echo "\n--- Running Graph Tests ---"
+	@./$(GRAPH_TEST_EXE)
 
-# Build and Compile Tests 
+# Compile Tensor Tests
 $(TENSOR_TEST_EXE): $(TEST_DIR)/tensor_test.cpp
 	@mkdir -p $(BUILD_DIR)
 	@$(CXX) $(CXXFLAGS) $< -o $@
 
+# Compile Model Tests 
 $(MODEL_TEST_EXE): $(TEST_DIR)/model_test.cpp $(PROTO_SRC)
+	@mkdir -p $(BUILD_DIR)
+	@$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
+
+# Compile Graph Tests
+$(GRAPH_TEST_EXE): $(TEST_DIR)/graph_test.cpp $(PROTO_SRC)
 	@mkdir -p $(BUILD_DIR)
 	@$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 # Clean
 clean:
 	@rm -rf $(BUILD_DIR)
+	@echo "Cleaned build directory."
 
 .PHONY: all test clean
