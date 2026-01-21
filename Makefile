@@ -10,6 +10,7 @@ BUILD_DIR = build
 
 # Source Files
 PROTO_SRC = $(SRC_DIR)/onnx-ml.pb.cc
+GRAPH_SRC = $(SRC_DIR)/graph.cpp
 
 # Targets
 TENSOR_TEST_EXE = $(BUILD_DIR)/run_tensor_tests
@@ -43,7 +44,7 @@ $(MODEL_TEST_EXE): $(TEST_DIR)/model_test.cpp $(PROTO_SRC)
 	@$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 # Compile Graph Tests
-$(GRAPH_TEST_EXE): $(TEST_DIR)/graph_test.cpp $(PROTO_SRC)
+$(GRAPH_TEST_EXE): $(TEST_DIR)/graph_test.cpp $(PROTO_SRC) $(GRAPH_SRC)
 	@mkdir -p $(BUILD_DIR)
 	@$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
