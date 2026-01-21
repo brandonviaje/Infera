@@ -6,7 +6,7 @@
 class ReluOperator : public Operator
 {
 public:
-    void compute(const Node& node, const std::vector<Tensor<float>*>& inputs, Tensor<float>& output) override
+    void compute([[maybe_unused]]const Node& node, const std::vector<Tensor<float>*>& inputs, Tensor<float>& output) override
     {
         const Tensor<float>* input {inputs[0]};
         output = Tensor<float>(input->shape()); // set output shape to same shape as input
