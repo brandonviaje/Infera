@@ -6,7 +6,7 @@
 class GemmOperator : public Operator
 {
 public:
-    void compute(const Node& node, const std::vector<Tensor<float>*>& inputs, Tensor<float>& output) override
+    void compute([[maybe_unused]]const Node& node, const std::vector<Tensor<float>*>& inputs, Tensor<float>& output) override
     {
         // inputs
         const Tensor<float>* A = inputs[0];
@@ -18,7 +18,6 @@ public:
         float beta{node.get_attribute("beta").f()};
         bool transA{node.get_attribute("transA").i() == 1};
         bool transB{node.get_attribute("transB").i() == 1};
-        
 
         // treat missing alpha/beta as 1.0
         if (alpha == 0.0f) alpha = 1.0f;
