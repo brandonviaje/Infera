@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <iostream>
+#include <map>
 #include "onnx-ml.pb.h"
 
 class Node
