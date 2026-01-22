@@ -1,63 +1,52 @@
 #ifndef NODE_H
 #define NODE_H
 
-#include <string>
-#include <vector>
 #include <iostream>
 #include <map>
+#include <optional>
+#include <string>
+#include <vector>
+#include "attribute.h"
 #include "onnx-ml.pb.h"
 
 class Node
 {
 public:
-    explicit Node(const onnx::NodeProto &proto)
-    {
-        name_ = proto.name();
-        op_type_ = proto.op_type();
-
-        for (const auto &input : proto.input())
-            inputs_.push_back(input);
-        for (const auto &output : proto.output())
-            outputs_.push_back(output);
-
-        // parse attributes
-        for (const auto &attr : proto.attribute())
+    Node(const onnx::NodeProto &node_proto) : name_(node_proto.name()), optype_(node_proto.op_type()),inputs_(node_proto.input().begin(), node_proto.input().end()), outputs_(node_proto.output().begin(), node_proto.output().end()) 
+    { 
+        // parse attributes from node 
+        for (const auto &attribute_proto : node_proto.attribute()) 
         {
-            attributes_[attr.name()] = attr;
+            attributes_.emplace(attribute_proto.name(), Attribute(attribute_proto)); // key: attr name, val: attr object
         }
     }
-
-    // graph connectivity : store the index of neighbors in the graph's node list
-    std::vector<size_t> parents;
-    std::vector<size_t> children;
 
     // getters
-    std::string name() const { return name_; }
-    std::string op_type() const { return op_type_; }
-    const std::vector<std::string> &inputs() const { return inputs_; }
-    const std::vector<std::string> &outputs() const { return outputs_; }
+    std::string get_name() const { return name_; }
+    std::string get_optype() const { return optype_; }
+    const std::vector<std::string> &get_inputs() const { return inputs_; }
+    const std::vector<std::string> &get_outputs() const { return outputs_; }
+    const std::unordered_map<std::string, Attribute> &get_attributes() const {return attributes_;}
+    void add_inputs(std::string input) { inputs_.push_back(input);}
+    void add_outputs(std::string output) {outputs_.push_back(output);};
 
-    onnx::AttributeProto get_attribute(const std::string &key) const
+    template <typename T>
+    std::optional<T> get_attribute(const std::string &name) const
     {
-        if (attributes_.find(key) != attributes_.end())
+        // check if attribute exists and is of type T
+        if(attributes_.find(name) != attributes_.end() && std::holds_alternative<T>(attributes_.find(name)->second.get_value()))
         {
-            return attributes_.at(key);
+            return std::get<T>(attributes_.find(name)->second.get_value());    // return value
         }
-        return onnx::AttributeProto(); // return empty if not found
-    }
-
-    void print() const
-    {
-        std::cout << "Node [" << op_type_ << "]: " << name_ << "\n";
-        std::cout << "  In: " << parents.size() << " | Out: " << children.size() << " | Attrs: " << attributes_.size() << "\n";
+        return std::nullopt;                                                   // else return nullopt
     }
 
 private:
     std::string name_{};
-    std::string op_type_{};
+    std::string optype_{};
     std::vector<std::string> inputs_{};
     std::vector<std::string> outputs_{};
-    std::map<std::string, onnx::AttributeProto> attributes_;
+    std::unordered_map<std::string, Attribute> attributes_;
 };
 
 #endif
