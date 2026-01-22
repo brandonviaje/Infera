@@ -6,20 +6,25 @@
 class ReluOperator : public Operator
 {
 public:
-    void compute([[maybe_unused]]const Node& node, const std::vector<Tensor<float>*>& inputs, Tensor<float>& output) override
+    void forward(const std::vector<Tensor<float>*>& inputs, std::vector<Tensor<float>*>& outputs) override
     {
-        const Tensor<float>* input {inputs[0]};
-        output = Tensor<float>(input->shape()); // set output shape to same shape as input
+        const Tensor<float>* X = inputs[0];
 
-        const float* in_ptr {input->data()};
-        float* out_ptr {output.data()};
-        std::size_t total_elements {input->size()};
+        // prepare output
+        Tensor<float>* Y = new Tensor<float>(X->shape());
+        outputs.push_back(Y);
 
-        // apply ReLU to elem-wise
-        for (std::size_t i{}; i < total_elements; ++i) 
+        // ptrs to data
+        const float* x_ptr = X->data();
+        float* y_ptr       = Y->data();
+        std::size_t size   = X->size();
+
+        // apply relu element-wise
+        
+        for (std::size_t i{}; i < size; ++i) 
         {
-            float val {in_ptr[i]};
-            out_ptr[i] = (val > 0.0f) ? val : 0.0f;   // ReLU: f(x) = max(0,x)
+            float val = x_ptr[i];
+            y_ptr[i] = (val > 0.0f) ? val : 0.0f; // f(x) = max(0, x)
         }
     }
 };

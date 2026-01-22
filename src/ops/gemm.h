@@ -2,74 +2,83 @@
 #define OPS_GEMM_H
 
 #include "../operator.h"
+#include "../attribute.h"
+#include "../tensor.h"
+#include <cmath>
 
 class GemmOperator : public Operator
 {
 public:
-    void compute([[maybe_unused]]const Node& node, const std::vector<Tensor<float>*>& inputs, Tensor<float>& output) override
+    // parse and set attributes
+    void set_attributes(const Node& node) override 
+    {
+        // ONNX defaults: alpha=1.0, beta=1.0, transA=0, transB=0
+        alpha_  = node.get_attribute<float>("alpha").value_or(1.0f);
+        beta_   = node.get_attribute<float>("beta").value_or(1.0f);
+        transA_ = node.get_attribute<int64_t>("transA").value_or(0);
+        transB_ = node.get_attribute<int64_t>("transB").value_or(0);
+    }
+
+    // execute GEMM operation
+    void forward(const std::vector<Tensor<float>*>& inputs, std::vector<Tensor<float>*>& outputs) override
     {
         // inputs
         const Tensor<float>* A = inputs[0];
         const Tensor<float>* B = inputs[1]; 
-        const Tensor<float>* C = (inputs.size() > 2) ? inputs[2] : nullptr; // optional
+        const Tensor<float>* C = (inputs.size() > 2) ? inputs[2] : nullptr; // bias (optional)
 
-        // give attributes default values
-        float alpha{node.get_attribute("alpha").f()};
-        float beta{node.get_attribute("beta").f()};
-        bool transA{node.get_attribute("transA").i() == 1};
-        bool transB{node.get_attribute("transB").i() == 1};
+        // determine dimensions based on transpose flags
+        std::size_t M = transA_ ? A->shape()[1] : A->shape()[0]; 
+        std::size_t K = transA_ ? A->shape()[0] : A->shape()[1]; 
+        std::size_t N = transB_ ? B->shape()[0] : B->shape()[1]; 
 
-        // treat missing alpha/beta as 1.0
-        if (alpha == 0.0f) alpha = 1.0f;
-        if (beta  == 0.0f) beta  = 1.0f;
+        // prepare output
+        Tensor<float>* Y = new Tensor<float>({M, N});
+        outputs.push_back(Y);
 
-        // calculate dimensions : if transA is true swap rows/cols 
-        std::size_t M{transA ? A->shape()[1] : A->shape()[0]}; // output rows
-        std::size_t K{transA ? A->shape()[0] : A->shape()[1]}; // inner dimensions
-        std::size_t N{transB ? B->shape()[0] : B->shape()[1]}; // output cols
-
-        // allocate output
-        output = Tensor<float>({M, N});
-
-        // pointers memory access
+        // init raw pointers 
         const float* a_ptr = A->data(); 
         const float* b_ptr = B->data(); 
         const float* c_ptr = C ? C->data() : nullptr;
-        float* y_ptr = output.data();
+        float* y_ptr       = Y->data();
 
-        // GEMM 
-        for (std::size_t m {}; m < M; ++m) 
+        std::size_t a_width = A->shape()[1];
+        std::size_t b_width = B->shape()[1];
+        
+        // GEMM loop
+        for (std::size_t m = 0; m < M; ++m) 
         {
-            for (std::size_t n {}; n < N; ++n) 
+            for (std::size_t n = 0; n < N; ++n) 
             {
-
                 float sum = 0.0f;
 
-                for (std::size_t k {}; k < K; ++k) 
+                for (std::size_t k = 0; k < K; ++k) 
                 {
-                    // logical transpose matrix
-                    std::size_t a_width {A->shape()[1]};
-                    float val_a {transA ? a_ptr[k * a_width + m] : a_ptr[m * a_width + k]};
-
-                    std::size_t b_width {B->shape()[1]};
-                    float val_b {transB ? b_ptr[n * b_width + k] : b_ptr[k * b_width + n]};
+                    // handle transposes via index mapping
+                    float val_a = transA_ ? a_ptr[k * a_width + m] : a_ptr[m * a_width + k]; // A[m, k] normally. If transA, we read A[k, m]
+                    float val_b = transB_ ? b_ptr[n * b_width + k] : b_ptr[k * b_width + n]; // B[k, n] normally. If transB, we read B[n, k]
 
                     sum += val_a * val_b;
                 }
 
-                // scale matmul
-                sum *= alpha;
+                // add scaling with alpha
+                sum *= alpha_;
 
-                // add bias if present 
+                // apply bias if available
                 if (c_ptr) 
                 {
-                    sum += beta * c_ptr[n];
+                    sum += beta_ * c_ptr[n];
                 }
-
                 y_ptr[m * N + n] = sum;
             }
         }
     }
+
+private:
+    float alpha_ = 1.0f;
+    float beta_  = 1.0f;
+    bool transA_ = false;
+    bool transB_ = false;
 };
 
 #endif
