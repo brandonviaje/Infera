@@ -32,7 +32,6 @@ public:
         const float* b_ptr = B->data();
         float* y_ptr       = Y->data();
 
-        // iterate through dim
         std::size_t total_elements = 1;
 
         for (std::size_t dim : A->shape()) 
