@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <fstream>
 #include <cassert>
 #include <algorithm>
 #include "../src/graph.h"
@@ -72,11 +73,42 @@ void test_graph_construction()
     std::cout << "---------------------------------------------------\n";
 }
 
+void test_load_from_file() {
+    std::cout << "\nRunning File Load Test...\n";
+    
+    std::string path = "models/mnist_ffn.onnx";
+    std::ifstream input_file(path, std::ios::binary);
+
+    if (!input_file.is_open()) 
+    {
+        std::cerr << "  [SKIP] Could not open " << path << ".\n";
+        return;
+    }
+
+    // load model proto
+    onnx::ModelProto model_proto;
+    if (!model_proto.ParseFromIstream(&input_file)) 
+    {
+        throw std::runtime_error("Failed to parse ONNX file");
+    }
+
+    std::cout << "  File loaded successfully.\n";
+
+    Graph graph(model_proto.graph());                                       // extract graph proto and build graph
+
+    // assert
+    std::cout << "  Graph Name: " << model_proto.graph().name() << "\n";
+    std::cout << "  Inputs: " << graph.get_input_name(0) << "\n";
+    graph.print_graph(); 
+    std::cout << "  [PASS] File loading successful.\n";
+}
+
 int main() 
 {
     try 
     {
         test_graph_construction();
+        test_load_from_file();
         std::cout << "\nGRAPH TESTS PASSED!\n";
     } 
     catch (const std::exception& e) 
