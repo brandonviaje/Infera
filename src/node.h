@@ -21,7 +21,7 @@ public:
         }
     }
 
-    // getters
+    // getters and setters
     std::string get_name() const { return name_; }
     std::string get_optype() const { return optype_; }
     const std::vector<std::string> &get_inputs() const { return inputs_; }
@@ -29,7 +29,8 @@ public:
     const std::unordered_map<std::string, Attribute> &get_attributes() const {return attributes_;}
     void add_inputs(std::string input) { inputs_.push_back(input);}
     void add_outputs(std::string output) {outputs_.push_back(output);};
-
+    void set_name(const std::string& name) { name_ = name; }
+    
     template <typename T>
     std::optional<T> get_attribute(const std::string &name) const
     {
@@ -40,7 +41,7 @@ public:
         }
         return std::nullopt;                                                   // else return nullopt
     }
-
+    
 private:
     std::string name_{};
     std::string optype_{};
