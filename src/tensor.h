@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <numeric>
 #include <string>
+#include <stdexcept>
 #include <vector>
 
 template <typename T>
