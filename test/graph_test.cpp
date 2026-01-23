@@ -39,16 +39,10 @@ void test_graph_construction()
     auto* output = graph_proto.add_output();
     output->set_name("Output_Data");
 
-    // Node A: Entry point (Conv)
+    // A -> B, A -> C, B+C -> D
     *graph_proto.add_node() = create_node_proto("Node_A", "Conv", {"Input_Data"}, {"Val_A"});
-
-    // Node B: Left branch (Relu)
     *graph_proto.add_node() = create_node_proto("Node_B", "Relu", {"Val_A"}, {"Val_B"});
-
-    // Node C: Right branch (Relu)
     *graph_proto.add_node() = create_node_proto("Node_C", "Relu", {"Val_A"}, {"Val_C"});
-
-    // Node D: Merge point (Add)
     *graph_proto.add_node() = create_node_proto("Node_D", "Add", {"Val_B", "Val_C"}, {"Output_Data"});
 
     // build graph
@@ -103,12 +97,62 @@ void test_load_from_file() {
     std::cout << "  [PASS] File loading successful.\n";
 }
 
+void test_topological_sort() 
+{
+    std::cout << "\nRunning Topological Sort Test...\n";
+
+    onnx::GraphProto graph_proto;
+    graph_proto.set_name("SortTest");
+
+    // graph inputs
+    auto* input = graph_proto.add_input();
+    input->set_name("in");
+
+    // define nodes
+    *graph_proto.add_node() = create_node_proto("Node_End", "Add", {"mid1", "mid2"}, {"out"});
+    *graph_proto.add_node() = create_node_proto("Node_Middle_1", "Relu", {"start_out"}, {"mid1"});
+    *graph_proto.add_node() = create_node_proto("Node_Start", "Conv", {"in"}, {"start_out"});
+    *graph_proto.add_node() = create_node_proto("Node_Middle_2", "Relu", {"start_out"}, {"mid2"});
+    *graph_proto.add_node() = create_node_proto("Node_Weight_Only", "Gemm", {"W_matrix"}, {"w_out"});
+
+    // define initializers
+    auto* init = graph_proto.add_initializer();
+    init->set_name("W_matrix");
+    init->add_dims(1);            
+    init->add_float_data(1.0f);    
+
+    // construct graph
+    Graph graph(graph_proto);
+
+    // perform sort
+    std::vector<Node*> sorted = graph.topological_sort();
+
+    std::cout << " Sorted Order: ";
+    std::unordered_map<std::string, int> pos;
+    for (size_t i = 0; i < sorted.size(); ++i) 
+    {
+        std::cout << sorted[i]->get_name() << " ";
+        pos[sorted[i]->get_name()] = i;
+    }
+    std::cout << "\n";
+
+    // Assertions
+    assert(pos["Node_Start"] < pos["Node_Middle_1"]);
+    assert(pos["Node_Start"] < pos["Node_Middle_2"]);
+    assert(pos["Node_Middle_1"] < pos["Node_End"]);
+    assert(pos["Node_Middle_2"] < pos["Node_End"]);
+    assert(pos.find("Node_Weight_Only") != pos.end());
+
+    std::cout << " [PASS] Topological sort respects dependencies.\n";
+}
+
 int main() 
 {
     try 
     {
         test_graph_construction();
         test_load_from_file();
+        test_topological_sort();
         std::cout << "\nGRAPH TESTS PASSED!\n";
     } 
     catch (const std::exception& e) 
