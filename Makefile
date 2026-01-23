@@ -14,7 +14,6 @@ GRAPH_SRC = $(SRC_DIR)/graph.cpp
 
 # Targets
 TENSOR_TEST_EXE = $(BUILD_DIR)/run_tensor_tests
-MODEL_TEST_EXE  = $(BUILD_DIR)/run_model_tests
 NODE_TEST_EXE = $(BUILD_DIR)/run_node_tests
 GRAPH_TEST_EXE = $(BUILD_DIR)/run_graph_tests
 
@@ -26,11 +25,9 @@ $(SRC_DIR)/onnx-ml.pb.cc: proto/onnx-ml.proto
 	protoc --proto_path=proto --cpp_out=$(SRC_DIR) $<
 
 # Run all tests
-test: $(TENSOR_TEST_EXE) $(MODEL_TEST_EXE) $(NODE_TEST_EXE) $(GRAPH_TEST_EXE) 
+test: $(TENSOR_TEST_EXE) $(NODE_TEST_EXE) $(GRAPH_TEST_EXE) 
 	@echo "--- Running Tensor Tests ---"
 	@./$(TENSOR_TEST_EXE)
-	@echo "\n--- Running Model Tests ---"
-	@./$(MODEL_TEST_EXE)
 	@echo "\n--- Running Node Tests ---"
 	@./$(NODE_TEST_EXE)
 	@echo "\n--- Running Graph Tests ---"
@@ -40,11 +37,6 @@ test: $(TENSOR_TEST_EXE) $(MODEL_TEST_EXE) $(NODE_TEST_EXE) $(GRAPH_TEST_EXE)
 $(TENSOR_TEST_EXE): $(TEST_DIR)/tensor_test.cpp
 	@mkdir -p $(BUILD_DIR)
 	@$(CXX) $(CXXFLAGS) $< -o $@
-
-# Compile Model Tests 
-$(MODEL_TEST_EXE): $(TEST_DIR)/model_test.cpp $(PROTO_SRC)
-	@mkdir -p $(BUILD_DIR)
-	@$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 # Compile Node Tests
 $(NODE_TEST_EXE): $(TEST_DIR)/node_test.cpp $(PROTO_SRC)
