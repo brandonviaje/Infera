@@ -2,3 +2,4 @@ build/
 *.o
 src/*.pb.cc
 src/*.pb.h
+infera
