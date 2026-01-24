@@ -26,7 +26,7 @@ $(TARGET): $(SRC)
 
 $(SRC_DIR)/onnx-ml.pb.cc: proto/onnx-ml.proto
 	@echo "Generating Protobuf files..."
-	protoc --proto_path=$(SRC_DIR) --cpp_out=$(SRC_DIR) $<
+	protoc --proto_path=proto --cpp_out=$(SRC_DIR) onnx-ml.proto
 
 # Run all tests
 test: $(TENSOR_TEST_EXE) $(NODE_TEST_EXE) $(GRAPH_TEST_EXE)  $(INFERENCE_TEST_EXE)
