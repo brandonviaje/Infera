@@ -12,11 +12,11 @@
 #include "ops/relu.h"
 #include "ops/add.h"
 
-class Registry
+class OperatorRegistry
 {
 public:
     //  simple factory design pattern
-    static std::unique_ptr<Operator> create(const std::string& type)
+    static std::unique_ptr<Operator> create_operator(const std::string& type)
     {
         if(type == "Add")
         {
