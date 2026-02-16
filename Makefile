@@ -11,6 +11,7 @@ BUILD_DIR = build
 # SRC Files
 PROTO_SRC = $(SRC_DIR)/onnx-ml.pb.cc
 GRAPH_SRC = $(SRC_DIR)/graph.cpp
+IMAGE_LOADER_SRC = $(SRC_DIR)/image_loader.cpp
 INFERENCE_SRC = $(SRC_DIR)/inference_engine.cpp
 
 # Targets
@@ -22,7 +23,7 @@ TARGET = infera
 
 all: $(TARGET)
 
-$(TARGET): $(SRC_DIR)/main.cpp $(PROTO_SRC) $(GRAPH_SRC) $(INFERENCE_SRC) $(PARSER_SRC)
+$(TARGET): $(SRC_DIR)/main.cpp $(PROTO_SRC) $(GRAPH_SRC) $(INFERENCE_SRC) $(PARSER_SRC) $(IMAGE_LOADER_SRC)
 	@$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 $(SRC_DIR)/onnx-ml.pb.cc: proto/onnx-ml.proto
