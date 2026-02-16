@@ -50,6 +50,29 @@ A **Machine Learning Inference Server** is a specialized server that hosts train
 
 <img width="1000" height="700" alt="Inference Server" src="https://github.com/user-attachments/assets/50655ea3-88e2-40e3-b19d-f4f8e3b80f8a" />
 
+# How to run it
+
+1. Clone the repo
+```
+git clone https://github.com/brandonviaje/Infera.git
+```
+2. Change Directory
+```
+cd Infera
+```
+
+3. Build the project
+```
+make
+```
+
+4. Run Project
+```
+./infera <model.onnx> <image.png>
+```
+
+Currently, only works with `models/mnist_ffn.onnx`, haven't added the other operators for the other models.
+
 # Acknowledgements
 - [Matrix Mul Optimization](https://en.algorithmica.org/hpc/algorithms/matmul/)
 - [ONNX Operators Documentation](https://onnx.ai/onnx/operators/index.html)
@@ -58,6 +81,7 @@ A **Machine Learning Inference Server** is a specialized server that hosts train
 - [Understanding Inference Engine](https://www.gmicloud.ai/glossary/inference-engine)
 
 **Inspired by the ONNX Runtime framework and motivated by Michal Pitr (goat).**
+
 
 
 
