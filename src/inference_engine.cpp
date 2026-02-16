@@ -1,36 +1,51 @@
 #include "inference_engine.h"
-#include "operator_registry.h" 
+#include "operator_registry.h"
 #include <iostream>
 #include <stdexcept>
 
-std::vector<Tensor<float>*> InferenceEngine::run(Graph& graph, const std::vector<Tensor<float>*>& inputs) 
+// build execution plan + allocate tensors
+void InferenceEngine::compile(Graph& graph, const std::vector<std::vector<size_t>>& input_shapes)
 {
-    // reset state
-    symbol_table_.clear();
+    std::cout << "[Compiler] Starting compilation...\n";
+
+    // reset engine state
+    execution_plan_.clear();
+    op_store_.clear();
     tensor_arena_.clear();
+    symbol_table_.clear();
+    graph_input_names_.clear();
+    graph_output_names_.clear();
 
-    // make sure input counts match 
-    if (inputs.size() != graph.get_input_size()) 
+    // validate input shape count
+    if (input_shapes.size() != graph.get_input_size()) 
     {
-        throw std::runtime_error("input size mismatch! graph expects " + std::to_string(graph.get_input_size()) + " inputs but got " + std::to_string(inputs.size()));
+        throw std::runtime_error("Input shape count mismatch");
     }
 
-    // map graph input names to input tensors
-    for (std::size_t i {}; i < inputs.size(); ++i) 
+    // store graph input names + allocate input tensors
+    for (std::size_t i = 0; i < graph.get_input_size(); ++i) 
     {
-        const std::string& name = graph.get_input_name(i);
-        symbol_table_[name] = inputs[i];
+        std::string name = graph.get_input_name(i);
+        graph_input_names_.push_back(name);
+
+        auto tensor = std::make_unique<Tensor<float>>(input_shapes[i]);
+        symbol_table_[name] = tensor.get();
+        tensor_arena_.push_back(std::move(tensor));
     }
 
-    // grab nodes in topological order
-    auto sorted_nodes = graph.topological_sort();
+    // store graph output names
+    for (std::size_t i = 0; i < graph.get_output_size(); ++i) 
+    {
+        graph_output_names_.push_back(graph.get_output_name(i));
+    }
 
-    // preload all initializer tensors 
+    auto sorted_nodes = graph.topological_sort(); // sort nodes
+
+    // preload initializers (weights)
     for (const auto& node : sorted_nodes) 
     {
         for (const auto& input_name : node->get_inputs()) 
         {
-            // if the graph owns this tensor, pull it in
             if (graph.has_initializer(input_name)) 
             {
                 symbol_table_[input_name] = graph.get_initializer(input_name);
@@ -38,43 +53,32 @@ std::vector<Tensor<float>*> InferenceEngine::run(Graph& graph, const std::vector
         }
     }
 
-    std::cout << "starting inference engine...\n";
-
-    // execution loop
-    for (Node* node : sorted_nodes) 
+    // build execution plan
+    for (const auto* node : sorted_nodes)
     {
-        std::string op_type = node->get_optype(); 
-        std::cout << "Running Node: " << node->get_name() << " [" << op_type << "]" << std::endl;
+        std::string op_type = node->get_optype();
 
-        // create the operator from the registry
         auto op = OperatorRegistry::create_operator(op_type);
-
-        if (!op)  
-        {
-            std::cerr << " [warning] no implementation for operator: " << op_type << " (skipping)\n";
+        if (!op) {
+            std::cerr << "[Warning] Unknown operator: "
+                      << op_type << "\n";
             continue;
         }
 
         op->set_attributes(*node);
 
-        // collect input tensors for this operator
-
+        // resolve inputs
         std::vector<Tensor<float>*> op_inputs;
         for (const auto& name : node->get_inputs()) 
         {
-            if (symbol_table_.find(name) == symbol_table_.end()) 
-            {
-                throw std::runtime_error("runtime error: missing dependency '" + name + "' for node " + node->get_name());
-            }
-            op_inputs.push_back(symbol_table_[name]);
+            op_inputs.push_back(symbol_table_.at(name));
         }
 
-        // allocate output tensors and register them
+        // alloc outputs
         std::vector<Tensor<float>*> op_outputs;
-
         for (const auto& name : node->get_outputs()) 
         {
-            auto new_tensor = std::make_unique<Tensor<float>>(std::vector<std::size_t>{});
+            auto new_tensor = std::make_unique<Tensor<float>>();
             Tensor<float>* ptr = new_tensor.get();
 
             tensor_arena_.push_back(std::move(new_tensor));
@@ -82,26 +86,54 @@ std::vector<Tensor<float>*> InferenceEngine::run(Graph& graph, const std::vector
             op_outputs.push_back(ptr);
         }
 
-        op->forward(op_inputs, op_outputs);
+        // run shape inference 
+        op->compute_output_shapes(op_inputs, op_outputs);
+
+        // store execution step
+        execution_plan_.push_back({
+            op.get(),
+            op_inputs,
+            op_outputs,
+            node->get_name()
+        });
+
+        op_store_.push_back(std::move(op));
     }
 
-    // collect final graph outputs 
-    std::vector<Tensor<float>*> final_results;
+    std::cout << "[Compiler] Compilation complete. Nodes compiled: " << execution_plan_.size() << "\n";
+}
 
-    // loop by index since output names are index-based
-    for (std::size_t i {}; i < graph.get_output_size(); ++i) 
+std::vector<Tensor<float>*> InferenceEngine::run(const std::vector<Tensor<float>*>& inputs)
+{
+    // check if engine compiled first
+    if (execution_plan_.empty()) 
     {
-        const std::string& name = graph.get_output_name(i);
-
-        if (symbol_table_.count(name)) 
-        {
-            final_results.push_back(symbol_table_[name]);
-        } 
-        else 
-        {
-            throw std::runtime_error("graph output '" + name + "' was not produced during inference.");
-        }
+        throw std::runtime_error("Engine not compiled.");
     }
 
-    return final_results;
+    if (inputs.size() != graph_input_names_.size()) throw std::runtime_error("Input size mismatch.");
+    
+    // copy runtime inputs into preallocated tensors
+    for (std::size_t i = 0; i < inputs.size(); ++i) 
+    {
+        const std::string& name = graph_input_names_[i];
+        *symbol_table_.at(name) = *inputs[i];
+    }
+
+    std::cout << "[Runtime] Executing compiled graph...\n";
+
+    // exec plan 
+    for (auto& step : execution_plan_) 
+    {
+        step.op->forward(step.inputs, step.outputs);
+    }
+
+    // build outputs
+    std::vector<Tensor<float>*> results;
+    for (const auto& name : graph_output_names_) 
+    {
+        results.push_back(symbol_table_.at(name));
+    }
+
+    return results;
 }
