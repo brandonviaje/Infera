@@ -1,100 +1,70 @@
+#include "arena.hpp"
+#include "ops.hpp"
+#include "tensor.hpp"
+#include <cuda_runtime.h>
 #include <iostream>
-#include <vector>
-#include <algorithm>
-#include <cmath> 
-#include "graph.h"
-#include "onnx_parser.h"
-#include "image_loader.h"
-#include "inference_engine.h"
-#include "tensor.h"
 
-int main(int argc, char** argv)
-{
-    if (argc < 3) 
-    {
-        std::cerr << "Usage: ./infera <model.onnx> <image.png>\n";
-        return 1;
+int main() {
+  try {
+    std::cout << "Waking up GPU...\n";
+    float *dummy;
+    cudaMalloc(&dummy, sizeof(float));
+    cudaFree(dummy);
+
+    TensorArena arena(128 * 1024 * 1024); // allocate big ass arena
+
+    std::vector<int> shape = {1024, 1024};
+
+    Tensor Input(arena, shape);
+    Tensor Weights(arena, shape);
+    Tensor Bias(arena, shape);
+
+    Tensor MatMul_Result(arena, shape);
+    Tensor Add_Result(arena, shape);
+    Tensor Final_Output(arena, shape);
+
+    // init with test data
+    float *in_data = Input.data_as<float>();
+    float *w_data = Weights.data_as<float>();
+    float *b_data = Bias.data_as<float>();
+
+    for (size_t i = 0; i < Input.num_elements(); ++i) {
+      in_data[i] = 1.0f;
+      w_data[i] = 1.0f;
+      b_data[i] = -1500.0f;
     }
 
-    std::string model_path = argv[1];
-    std::string image_path = argv[2];
+    std::cout << "Executing Layer Forward Pass on GPU...\n";
 
-    try {
-        // build Graph
-        Graph graph;
-        OnnxParser parser;
+    // matmul
+    ops::matmul_cuda(Input, Weights, MatMul_Result);
 
-        std::cout << "Loading Model: " << model_path << "...\n";
-        parser.parse(graph, model_path);
+    // add bias
+    ops::add_cuda(MatMul_Result, Bias, Add_Result);
 
-        // detect size dynamically
-        graph.infer_input_size();
+    // activation
+    ops::relu_cuda(Add_Result, Final_Output);
 
-        int req_h = graph.get_input_height();
-        int req_w = graph.get_input_width();
+    std::cout << "Layer Complete. Checking math...\n";
 
-        std::cout << "Model requires: " << req_w << "x" << req_h << "\n";
+    // verify the math for first element
 
-        // load image
-        std::cout << "Loading Image: " << image_path << "...\n";
-        Tensor<float>* input_tensor = ImageLoader::load_image(image_path, req_w, req_h);
+    // MatMul: 1024 elements of (1.0 * 1.0) added together = 1024.0
+    // add bias: 1024.0 + (-1500.0) = -476.0
+    // ReLU: max(0, -476.0) = 0.0
 
-        InferenceEngine engine;
-        std::cout << "Running Inference...\n";
+    float first_val = Final_Output.data_as<float>()[0];
+    std::cout << "Expected first value: 0\n";
+    std::cout << "Actual first value:   " << first_val << "\n";
 
-        std::vector<Tensor<float>*> inputs = { input_tensor };
-        std::vector<Tensor<float>*> outputs = engine.run(graph, inputs);
-
-        if (outputs.empty())
-            throw std::runtime_error("No output from engine.");
-
-        Tensor<float>* result = outputs[0];
-        const float* output_data = result->data();
-
-        // results using softmax
-        std::cout << "\n=== Results ===\n";
-        
-        float sum {};
-        std::vector<float> exp_values(10);
-        
-        // get max logit for numerical stability
-        float max_logit = -1e9f;
-        for (int i {}; i < 10; ++i) 
-        {
-            if (output_data[i] > max_logit) max_logit = output_data[i];
-        }
-
-        // exponentiate and sum
-        for (int i = 0; i < 10; ++i) 
-        {
-            exp_values[i] = std::exp(output_data[i] - max_logit);
-            sum += exp_values[i];
-        }
-
-        int predicted_digit = -1;
-        float max_prob = -1.0f;
-
-        for (int i {}; i < 10; ++i) 
-        {
-            float probability = exp_values[i] / sum;
-            float percent = probability * 100.0f;
-            std::cout << "Digit " << i << ": " << percent << "%\n";
-
-            if (probability > max_prob) 
-            {
-                max_prob = probability;
-                predicted_digit = i;
-            }
-        }
-
-        std::cout << "\nPREDICTION: " << predicted_digit  << " (Confidence: " << (int)(max_prob * 100) << "%)\n";
-        delete input_tensor; 
-    } 
-    catch (const std::exception& e) 
-    {
-        std::cerr << "Error: " << e.what() << "\n";
-        return 1;
+    if (first_val == 0.0f) {
+      std::cout << "SUCCESS: Engine successfully executed a layer!\n";
     }
 
-    return 0;
+  } catch (const std::exception &e) {
+    std::cerr << "Fatal Error: " << e.what() << std::endl;
+    return 1;
+  }
+
+  return 0;
 }
